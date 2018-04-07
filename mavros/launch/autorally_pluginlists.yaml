@@ -5,3 +5,5 @@ plugin_whitelist:
 - 'imu'
 - 'local_position'
 - 'sys_time'
+- 'sys_status'
+- 'command'
