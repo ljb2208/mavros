@@ -16,12 +16,20 @@
  */
 
 #include <cassert>
-#include <console_bridge/console.h>
 
+#include <mavconn/console_bridge_compat.h>
 #include <mavconn/thread_utils.h>
 #include <mavconn/tcp.h>
 
+// Ensure the correct io_service() is called based on boost version
+#if BOOST_VERSION >= 107000
+#define GET_IO_SERVICE(s) ((boost::asio::io_context&)(s).get_executor().context())
+#else
+#define GET_IO_SERVICE(s) ((s).get_io_service())
+#endif
+
 namespace mavconn {
+
 using boost::system::error_code;
 using boost::asio::io_service;
 using boost::asio::ip::tcp;
@@ -46,7 +54,7 @@ static bool resolve_address_tcp(io_service &io, size_t chan, std::string host, u
 		ep = q_ep;
 		ep.port(port);
 		result = true;
-		logDebug(PFXd "host %s resolved as %s", chan, host.c_str(), to_string_ss(ep).c_str());
+		CONSOLE_BRIDGE_logDebug(PFXd "host %s resolved as %s", chan, host.c_str(), to_string_ss(ep).c_str());
 	};
 
 #if BOOST_ASIO_VERSION >= 101200
@@ -56,7 +64,7 @@ static bool resolve_address_tcp(io_service &io, size_t chan, std::string host, u
 #endif
 
 	if (ec) {
-		logWarn(PFXd "resolve error: %s", chan, ec.message().c_str());
+		CONSOLE_BRIDGE_logWarn(PFXd "resolve error: %s", chan, ec.message().c_str());
 		result = false;
 	}
 
@@ -69,6 +77,7 @@ static bool resolve_address_tcp(io_service &io, size_t chan, std::string host, u
 MAVConnTCPClient::MAVConnTCPClient(uint8_t system_id, uint8_t component_id,
 		std::string server_host, unsigned short server_port) :
 	MAVConnInterface(system_id, component_id),
+	is_destroying(false),
 	tx_in_progress(false),
 	tx_q {},
 	rx_buf {},
@@ -79,7 +88,7 @@ MAVConnTCPClient::MAVConnTCPClient(uint8_t system_id, uint8_t component_id,
 	if (!resolve_address_tcp(io_service, conn_id, server_host, server_port, server_ep))
 		throw DeviceError("tcp: resolve", "Bind address resolve failed");
 
-	logInform(PFXd "Server address: %s", conn_id, to_string_ss(server_ep).c_str());
+	CONSOLE_BRIDGE_logInform(PFXd "Server address: %s", conn_id, to_string_ss(server_ep).c_str());
 
 	try {
 		socket.open(tcp::v4());
@@ -114,15 +123,16 @@ MAVConnTCPClient::MAVConnTCPClient(uint8_t system_id, uint8_t component_id,
 
 void MAVConnTCPClient::client_connected(size_t server_channel)
 {
-	logInform(PFXd "Got client, id: %zu, address: %s",
+	CONSOLE_BRIDGE_logInform(PFXd "Got client, id: %zu, address: %s",
 			server_channel, conn_id, to_string_ss(server_ep).c_str());
 
 	// start recv
-	socket.get_io_service().post(std::bind(&MAVConnTCPClient::do_recv, shared_from_this()));
+	GET_IO_SERVICE(socket).post(std::bind(&MAVConnTCPClient::do_recv, shared_from_this()));
 }
 
 MAVConnTCPClient::~MAVConnTCPClient()
 {
+	is_destroying = true;
 	close();
 }
 
@@ -132,12 +142,17 @@ void MAVConnTCPClient::close()
 	if (!is_open())
 		return;
 
+	socket.shutdown(boost::asio::ip::tcp::socket::shutdown_send);
+	socket.cancel();
+	socket.close();
+
 	io_work.reset();
 	io_service.stop();
-	socket.close();
 
 	if (io_thread.joinable())
 		io_thread.join();
+
+	io_service.reset();
 
 	if (port_closed_cb)
 		port_closed_cb();
@@ -146,7 +161,7 @@ void MAVConnTCPClient::close()
 void MAVConnTCPClient::send_bytes(const uint8_t *bytes, size_t length)
 {
 	if (!is_open()) {
-		logError(PFXd "send: channel closed!", conn_id);
+		CONSOLE_BRIDGE_logError(PFXd "send: channel closed!", conn_id);
 		return;
 	}
 
@@ -158,7 +173,7 @@ void MAVConnTCPClient::send_bytes(const uint8_t *bytes, size_t length)
 
 		tx_q.emplace_back(bytes, length);
 	}
-	socket.get_io_service().post(std::bind(&MAVConnTCPClient::do_send, shared_from_this(), true));
+	GET_IO_SERVICE(socket).post(std::bind(&MAVConnTCPClient::do_send, shared_from_this(), true));
 }
 
 void MAVConnTCPClient::send_message(const mavlink_message_t *message)
@@ -166,7 +181,7 @@ void MAVConnTCPClient::send_message(const mavlink_message_t *message)
 	assert(message != nullptr);
 
 	if (!is_open()) {
-		logError(PFXd "send: channel closed!", conn_id);
+		CONSOLE_BRIDGE_logError(PFXd "send: channel closed!", conn_id);
 		return;
 	}
 
@@ -180,13 +195,13 @@ void MAVConnTCPClient::send_message(const mavlink_message_t *message)
 
 		tx_q.emplace_back(message);
 	}
-	socket.get_io_service().post(std::bind(&MAVConnTCPClient::do_send, shared_from_this(), true));
+	GET_IO_SERVICE(socket).post(std::bind(&MAVConnTCPClient::do_send, shared_from_this(), true));
 }
 
-void MAVConnTCPClient::send_message(const mavlink::Message &message)
+void MAVConnTCPClient::send_message(const mavlink::Message &message, const uint8_t source_compid)
 {
 	if (!is_open()) {
-		logError(PFXd "send: channel closed!", conn_id);
+		CONSOLE_BRIDGE_logError(PFXd "send: channel closed!", conn_id);
 		return;
 	}
 
@@ -198,19 +213,22 @@ void MAVConnTCPClient::send_message(const mavlink::Message &message)
 		if (tx_q.size() >= MAX_TXQ_SIZE)
 			throw std::length_error("MAVConnTCPClient::send_message: TX queue overflow");
 
-		tx_q.emplace_back(message, get_status_p(), sys_id, comp_id);
+		tx_q.emplace_back(message, get_status_p(), sys_id, source_compid);
 	}
-	socket.get_io_service().post(std::bind(&MAVConnTCPClient::do_send, shared_from_this(), true));
+	GET_IO_SERVICE(socket).post(std::bind(&MAVConnTCPClient::do_send, shared_from_this(), true));
 }
 
 void MAVConnTCPClient::do_recv()
 {
+	if (is_destroying) {
+		return;
+	}
 	auto sthis = shared_from_this();
 	socket.async_receive(
 			buffer(rx_buf),
 			[sthis] (error_code error, size_t bytes_transferred) {
 				if (error) {
-					logError(PFXd "receive: %s", sthis->conn_id, error.message().c_str());
+					CONSOLE_BRIDGE_logError(PFXd "receive: %s", sthis->conn_id, error.message().c_str());
 					sthis->close();
 					return;
 				}
@@ -238,7 +256,7 @@ void MAVConnTCPClient::do_send(bool check_tx_state)
 				assert(bytes_transferred <= buf_ref.len);
 
 				if (error) {
-					logError(PFXd "send: %s", sthis->conn_id, error.message().c_str());
+					CONSOLE_BRIDGE_logError(PFXd "send: %s", sthis->conn_id, error.message().c_str());
 					sthis->close();
 					return;
 				}
@@ -270,12 +288,13 @@ MAVConnTCPServer::MAVConnTCPServer(uint8_t system_id, uint8_t component_id,
 		std::string server_host, unsigned short server_port) :
 	MAVConnInterface(system_id, component_id),
 	io_service(),
-	acceptor(io_service)
+	acceptor(io_service),
+	is_destroying(false)
 {
 	if (!resolve_address_tcp(io_service, conn_id, server_host, server_port, bind_ep))
 		throw DeviceError("tcp-l: resolve", "Bind address resolve failed");
 
-	logInform(PFXd "Bind address: %s", conn_id, to_string_ss(bind_ep).c_str());
+	CONSOLE_BRIDGE_logInform(PFXd "Bind address: %s", conn_id, to_string_ss(bind_ep).c_str());
 
 	try {
 		acceptor.open(tcp::v4());
@@ -299,6 +318,7 @@ MAVConnTCPServer::MAVConnTCPServer(uint8_t system_id, uint8_t component_id,
 
 MAVConnTCPServer::~MAVConnTCPServer()
 {
+	is_destroying = true;
 	close();
 }
 
@@ -308,7 +328,7 @@ void MAVConnTCPServer::close()
 	if (!is_open())
 		return;
 
-	logInform(PFXd "Terminating server. "
+	CONSOLE_BRIDGE_logInform(PFXd "Terminating server. "
 			"All connections will be closed.", conn_id);
 
 	io_service.stop();
@@ -384,16 +404,19 @@ void MAVConnTCPServer::send_message(const mavlink_message_t *message)
 	}
 }
 
-void MAVConnTCPServer::send_message(const mavlink::Message &message)
+void MAVConnTCPServer::send_message(const mavlink::Message &message, const uint8_t source_compid)
 {
 	lock_guard lock(mutex);
 	for (auto &instp : client_list) {
-		instp->send_message(message);
+		instp->send_message(message, source_compid);
 	}
 }
 
 void MAVConnTCPServer::do_accept()
 {
+	if (is_destroying) {
+		return;
+	}
 	auto sthis = shared_from_this();
 	auto acceptor_client = std::make_shared<MAVConnTCPClient>(sys_id, comp_id, io_service);
 	acceptor.async_accept(
@@ -401,7 +424,7 @@ void MAVConnTCPServer::do_accept()
 			acceptor_client->server_ep,
 			[sthis, acceptor_client] (error_code error) {
 				if (error) {
-					logError(PFXd "accept: %s", sthis->conn_id, error.message().c_str());
+					CONSOLE_BRIDGE_logError(PFXd "accept: %s", sthis->conn_id, error.message().c_str());
 					sthis->close();
 					return;
 				}
@@ -422,7 +445,7 @@ void MAVConnTCPServer::client_closed(std::weak_ptr<MAVConnTCPClient> weak_instp)
 {
 	if (auto instp = weak_instp.lock()) {
 		bool locked = mutex.try_lock();
-		logInform(PFXd "Client connection closed, id: %p, address: %s",
+		CONSOLE_BRIDGE_logInform(PFXd "Client connection closed, id: %p, address: %s",
 				conn_id, instp.get(), to_string_ss(instp->server_ep).c_str());
 
 		client_list.remove(instp);

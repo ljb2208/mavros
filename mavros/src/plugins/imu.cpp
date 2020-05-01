@@ -45,12 +45,17 @@ static constexpr double RAD_TO_DEG = 180.0 / M_PI;
 //! @brief IMU and attitude data publication plugin
 class IMUPlugin : public plugin::PluginBase {
 public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
 	IMUPlugin() : PluginBase(),
 		imu_nh("~imu"),
 		has_hr_imu(false),
 		has_raw_imu(false),
 		has_scaled_imu(false),
-		has_att_quat(false)
+		has_att_quat(false),
+		received_linear_accel(false),
+		linear_accel_vec_flu(Eigen::Vector3d::Zero()),
+		linear_accel_vec_frd(Eigen::Vector3d::Zero())
 	{ }
 
 	void initialize(UAS &uas_)
@@ -79,8 +84,10 @@ public:
 
 		imu_pub = imu_nh.advertise<sensor_msgs::Imu>("data", 10);
 		magn_pub = imu_nh.advertise<sensor_msgs::MagneticField>("mag", 10);
-		temp_pub = imu_nh.advertise<sensor_msgs::Temperature>("temperature", 10);
-		press_pub = imu_nh.advertise<sensor_msgs::FluidPressure>("atm_pressure", 10);
+		temp_imu_pub = imu_nh.advertise<sensor_msgs::Temperature>("temperature_imu", 10);
+		temp_baro_pub = imu_nh.advertise<sensor_msgs::Temperature>("temperature_baro", 10);
+		static_press_pub = imu_nh.advertise<sensor_msgs::FluidPressure>("static_pressure", 10);
+		diff_press_pub = imu_nh.advertise<sensor_msgs::FluidPressure>("diff_pressure", 10);
 		imu_raw_pub = imu_nh.advertise<sensor_msgs::Imu>("data_raw", 10);
 
 		// Reset has_* flags on connection change
@@ -105,13 +112,16 @@ private:
 	ros::Publisher imu_pub;
 	ros::Publisher imu_raw_pub;
 	ros::Publisher magn_pub;
-	ros::Publisher temp_pub;
-	ros::Publisher press_pub;
+	ros::Publisher temp_imu_pub;
+	ros::Publisher temp_baro_pub;
+	ros::Publisher static_press_pub;
+	ros::Publisher diff_press_pub;
 
 	bool has_hr_imu;
 	bool has_raw_imu;
 	bool has_scaled_imu;
 	bool has_att_quat;
+	bool received_linear_accel;
 	Eigen::Vector3d linear_accel_vec_flu;
 	Eigen::Vector3d linear_accel_vec_frd;
 	ftf::Covariance3d linear_acceleration_cov;
@@ -182,6 +192,12 @@ private:
 		imu_ned_msg->angular_velocity_covariance = angular_velocity_cov;
 		imu_ned_msg->linear_acceleration_covariance = linear_acceleration_cov;
 
+		if (!received_linear_accel) {
+			// Set element 0 of covariance matrix to -1 if no data received as per sensor_msgs/Imu defintion
+			imu_enu_msg->linear_acceleration_covariance[0] = -1;
+			imu_ned_msg->linear_acceleration_covariance[0] = -1;
+		}
+
 		/** Store attitude in base_link ENU
 		 *  @snippet src/plugins/imu.cpp store_enu
 		 */
@@ -225,6 +241,7 @@ private:
 		// Save readings
 		linear_accel_vec_flu = accel_flu;
 		linear_accel_vec_frd = accel_frd;
+		received_linear_accel = true;
 
 		imu_msg->orientation_covariance = unk_orientation_cov;
 		imu_msg->angular_velocity_covariance = angular_velocity_cov;
@@ -257,7 +274,7 @@ private:
 
 	/**
 	 * @brief Handle ATTITUDE MAVlink message.
-	 * Message specification: http://mavlink.org/messages/common/#ATTITUDE
+	 * Message specification: https://mavlink.io/en/messages/common.html#ATTITUDE
 	 * @param msg	Received Mavlink msg
 	 * @param att	ATTITUDE msg
 	 */
@@ -302,7 +319,7 @@ private:
 
 	/**
 	 * @brief Handle ATTITUDE_QUATERNION MAVlink message.
-	 * Message specification: http://mavlink.org/messages/common/#ATTITUDE_QUATERNION
+	 * Message specification: https://mavlink.io/en/messages/common.html/#ATTITUDE_QUATERNION
 	 * @param msg		Received Mavlink msg
 	 * @param att_q		ATTITUDE_QUATERNION msg
 	 */
@@ -344,7 +361,7 @@ private:
 
 	/**
 	 * @brief Handle HIGHRES_IMU MAVlink message.
-	 * Message specification: http://mavlink.org/messages/common/#HIGHRES_IMU
+	 * Message specification: https://mavlink.io/en/messages/common.html/#HIGHRES_IMU
 	 * @param msg		Received Mavlink msg
 	 * @param imu_hr	HIGHRES_IMU msg
 	 */
@@ -384,19 +401,33 @@ private:
 		}
 		// [mag_available]
 
-		/** Check if pressure sensor data is available:
-		 *  @snippet src/plugins/imu.cpp pressure_available
+		/** Check if static pressure sensor data is available:
+		 *  @snippet src/plugins/imu.cpp static_pressure_available
 		 */
-		// [pressure_available]
+		// [static_pressure_available]
 		if (imu_hr.fields_updated & (1 << 9)) {
-			auto atmp_msg = boost::make_shared<sensor_msgs::FluidPressure>();
+			auto static_pressure_msg = boost::make_shared<sensor_msgs::FluidPressure>();
 
-			atmp_msg->header = header;
-			atmp_msg->fluid_pressure = imu_hr.abs_pressure * MILLIBAR_TO_PASCAL;
+			static_pressure_msg->header = header;
+			static_pressure_msg->fluid_pressure = imu_hr.abs_pressure;
 
-			press_pub.publish(atmp_msg);
+			static_press_pub.publish(static_pressure_msg);
 		}
-		// [pressure_available]
+		// [static_pressure_available]
+
+		/** Check if differential pressure sensor data is available:
+		 *  @snippet src/plugins/imu.cpp differential_pressure_available
+		 */
+		// [differential_pressure_available]
+		if (imu_hr.fields_updated & (1 << 10)) {
+			auto differential_pressure_msg = boost::make_shared<sensor_msgs::FluidPressure>();
+
+			differential_pressure_msg->header = header;
+			differential_pressure_msg->fluid_pressure = imu_hr.diff_pressure;
+
+			diff_press_pub.publish(differential_pressure_msg);
+		}
+		// [differential_pressure_available]
 
 		/** Check if temperature data is available:
 		 *  @snippet src/plugins/imu.cpp temperature_available
@@ -408,14 +439,14 @@ private:
 			temp_msg->header = header;
 			temp_msg->temperature = imu_hr.temperature;
 
-			temp_pub.publish(temp_msg);
+			temp_imu_pub.publish(temp_msg);
 		}
 		// [temperature_available]
 	}
 
 	/**
 	 * @brief Handle RAW_IMU MAVlink message.
-	 * Message specification: http://mavlink.org/messages/common/#RAW_IMU
+	 * Message specification: https://mavlink.io/en/messages/common.html/#RAW_IMU
 	 * @param msg		Received Mavlink msg
 	 * @param imu_raw	RAW_IMU msg
 	 */
@@ -467,7 +498,7 @@ private:
 
 	/**
 	 * @brief Handle SCALED_IMU MAVlink message.
-	 * Message specification: http://mavlink.org/messages/common/#SCALED_IMU
+	 * Message specification: https://mavlink.io/en/messages/common.html/#SCALED_IMU
 	 * @param msg		Received Mavlink msg
 	 * @param imu_raw	SCALED_IMU msg
 	 */
@@ -500,7 +531,7 @@ private:
 
 	/**
 	 * @brief Handle SCALED_PRESSURE MAVlink message.
-	 * Message specification: http://mavlink.org/messages/common/#SCALED_PRESSURE
+	 * Message specification: https://mavlink.io/en/messages/common.html/#SCALED_PRESSURE
 	 * @param msg		Received Mavlink msg
 	 * @param press		SCALED_PRESSURE msg
 	 */
@@ -514,12 +545,17 @@ private:
 		auto temp_msg = boost::make_shared<sensor_msgs::Temperature>();
 		temp_msg->header = header;
 		temp_msg->temperature = press.temperature / 100.0;
-		temp_pub.publish(temp_msg);
+		temp_baro_pub.publish(temp_msg);
 
-		auto atmp_msg = boost::make_shared<sensor_msgs::FluidPressure>();
-		atmp_msg->header = header;
-		atmp_msg->fluid_pressure = press.press_abs * 100.0;
-		press_pub.publish(atmp_msg);
+		auto static_pressure_msg = boost::make_shared<sensor_msgs::FluidPressure>();
+		static_pressure_msg->header = header;
+		static_pressure_msg->fluid_pressure = press.press_abs * 100.0;
+		static_press_pub.publish(static_pressure_msg);
+
+		auto differential_pressure_msg = boost::make_shared<sensor_msgs::FluidPressure>();
+		differential_pressure_msg->header = header;
+		differential_pressure_msg->fluid_pressure = press.press_diff * 100.0;
+		diff_press_pub.publish(differential_pressure_msg);
 	}
 
 	// Checks for connection and overrides variable values

@@ -2,6 +2,143 @@
 Changelog for package libmavconn
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.1.0 (2020-04-04)
+------------------
+
+1.0.0 (2020-01-01)
+------------------
+
+0.33.4 (2019-12-12)
+-------------------
+* add macro for get_io_service() to work with boost>1.70
+* Contributors: acxz
+
+0.33.3 (2019-11-13)
+-------------------
+
+0.33.2 (2019-11-13)
+-------------------
+
+0.33.1 (2019-11-11)
+-------------------
+* resolved merge conflict
+* Contributors: David Jablonski
+
+0.33.0 (2019-10-10)
+-------------------
+* libmavconn: simplify parse_buffer, and fix dropped_packets and parse_error counters
+  Currently the dropped_packets & parse_error counters are always published as 0 in mavros_diag.cpp.
+  This seems to be caused by using the wrong status struct.
+  Seems like mavros was editing m_status after mavlink_frame_char_buffer. This struct
+  seems to be the parsing state, and looks like it shouldn't be modified by the caller (for example
+  status->parse_error is zeroed out in the end of mavlink_frame_char_buffer).
+  Also, the crc & signature checks done in mavros seems redundant.
+  r_mavlink_status seems to be the struct that holds the mavlink connection information, therefore I
+  changed get_status to return it instead.
+  This fixes `#1285 <https://github.com/mavlink/mavros/issues/1285>`_.
+* Contributors: Koby Aizer
+
+0.32.2 (2019-09-09)
+-------------------
+
+0.32.1 (2019-08-08)
+-------------------
+
+0.32.0 (2019-07-06)
+-------------------
+
+0.31.0 (2019-06-07)
+-------------------
+* readme: fix udp-pb formatting
+* Contributors: Vladimir Ermakov
+
+0.30.0 (2019-05-20)
+-------------------
+
+0.29.2 (2019-03-06)
+-------------------
+
+0.29.1 (2019-03-03)
+-------------------
+* All: catkin lint files
+* Contributors: Pierre Kancir
+
+0.29.0 (2019-02-02)
+-------------------
+* Merge branch 'master' into param-timeout
+* libmavconn: Fix building without installation. Detect CI environment
+* ci:test: temporary disable failed udp bind test
+* mavconn:pkg: Move generated files to build tree
+* Contributors: Vladimir Ermakov
+
+0.28.0 (2019-01-03)
+-------------------
+* libmavconn: add the possibility to set the source component ID through the send_message method
+* Contributors: TSC21
+
+0.27.0 (2018-11-12)
+-------------------
+* bind should be called after reuse_address is set
+* Contributors: Shahar Kosti
+
+0.26.3 (2018-08-21)
+-------------------
+* Prevent MAVConnTCPClient::do_recv and MAVConnTCPServer::do_accept from running after destruction has begun
+* libmavconn/CMakeLists.txt: link mavconn-test against pthread
+* Contributors: mlvov
+
+0.26.2 (2018-08-08)
+-------------------
+
+0.26.1 (2018-07-19)
+-------------------
+
+0.26.0 (2018-06-06)
+-------------------
+* libmavconn: add scheme for permanent UDP broadcasting
+* test python 3 f-string formatting
+* Contributors: Oleg Kalachev, Vladimir Ermakov
+
+0.25.1 (2018-05-14)
+-------------------
+* lib `#1026 <https://github.com/mavlink/mavros/issues/1026>`_: fix logInform compat
+* lib `#1026 <https://github.com/mavlink/mavros/issues/1026>`_: add compat header for older console-bridge
+* Contributors: Vladimir Ermakov
+
+0.25.0 (2018-05-11)
+-------------------
+* lib: console-bridge uses macroses...
+* lib: fixing console-bridge now prefixed
+* Contributors: Vladimir Ermakov
+
+0.24.0 (2018-04-05)
+-------------------
+* libmavconn: make serial.cpp more portable
+* libmavconn : enable low-latency mode on Linux
+  Some common USB-UART convertors like the FTDI accumulates individual bytes from the serial link
+  in order to send them in a single USB packet (Nagling). This commit sets the ASYNC_LOW_LATENCY flag,
+  which the FTDI kernel driver interprets as a request to drop the Nagling timer to 1ms (i.e send all
+  accumulated bytes after 1ms.)
+  This reduces average link RTT to under 5ms at 921600 baud, and enables the use of mavros in
+  systems where low latency is required to get good performance for e.g estimation and controls.
+* Contributors: Mohammed Kabir, Vladimir Ermakov
+
+0.23.3 (2018-03-09)
+-------------------
+* libmavconn: better preprocessor conditions for serial workaround
+* libmavconn : fix hardware flow control setting for Boost < v1.66
+  This commit fixes handling of hardware flow control. Due to bugs in Boost, set_option() would not work for flow control settings. This is fixed in Boost v1.66. Relevant Boost commit : https://github.com/boostorg/asio/commit/619cea4356
+* lib cmake: disable debug message
+* lib: simplify geolib cmake module, try to fix CI
+* Contributors: Mohammed Kabir, Vladimir Ermakov
+
+0.23.2 (2018-03-07)
+-------------------
+* mavconn: small style fix
+* Libmavconn : Set the serial port on Raw mode to prevent EOF error
+* Libmavconn: ensure the ports are cleanly closed before end connexions.
+* Contributors: Pierre Kancir, Vladimir Ermakov
+
 0.23.1 (2018-02-27)
 -------------------
 * compile also with boost >= 1.66.0
