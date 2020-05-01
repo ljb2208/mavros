@@ -425,6 +425,7 @@ private:
 	float gps_epv;
 	int gps_fix_type;
 	int gps_satellites_visible;
+	bool tf_send;
 
 	std::atomic<uint64_t> time_offset;
 	timesync_mode tsync_mode;
