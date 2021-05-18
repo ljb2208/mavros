@@ -2,6 +2,93 @@
 Changelog for package mavros_extras
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.8.0 (2021-05-05)
+------------------
+* extras: `#1370 <https://github.com/mavlink/mavros/issues/1370>`_: set obstacle aangle offset
+* extras: distance_sensor: rename param for custom orientation, apply uncrustify
+* distance_sensor: Add horizontal_fov_ratio, vertical_fov_ratio, sensor_orientation parameters
+* distance_sensor: Fill horizontal_fov, vertical_fov, quaternion
+* Contributors: Alexey Rogachevskiy, Vladimir Ermakov
+
+1.7.1 (2021-04-05)
+------------------
+
+1.7.0 (2021-04-05)
+------------------
+
+1.6.0 (2021-02-15)
+------------------
+* Fixed a bug in mavros_extras/src/plugins/odom.cpp by switching lines 175 and 180.
+  Rationale: The pose covariance matrix published to the /mavros/odometry/in topic is exclusively zeros. This is because the transformation matrix r_pose is initialised as zeros (line 140), then applied to the covariance matrix cov_pose (line 176) and then populated (line 180). Clearly the latter two steps should be the other way around, and the comments in the code appear to suggest that this was the intention, but that lines 175 and 180 were accidentally written the wrong way around. Having switched them, the pose covariance is now published to /mavros/odometry/in as expected.
+  JohnG897
+* Contributors: John Gifford
+
+1.5.2 (2021-02-02)
+------------------
+* bugfix - add estimator type in odom message
+  Add missing estimator_type field in  Odometry message.
+  Issue `#1524 <https://github.com/mavlink/mavros/issues/1524>`_
+* Contributors: Ashwin Varghese Kuruttukulam
+
+1.5.1 (2021-01-04)
+------------------
+* Initialise message structures
+  Uninitialised Mavlink 2 extension fields were sent if the fields were
+  not later set. Initialising the fields to zero is the default value for
+  extension fields and appears to the receiver as though sender is unaware
+  of Mavlink 2.
+  Instances were found with regex below, more may exist:
+  mavlink::[^:]+::msg::[^:={]+ ?[^:={]*;
+* Contributors: Rob Clarke
+
+1.5.0 (2020-11-11)
+------------------
+* mavros_extras: Fix member initialization order
+* mavros_extras: Add override specifiers
+* mavros_extras: distance_sensor: Don't publish data when orientation configuration does not match incomming data.
+* fake_gps: Fix assignment typo
+  This colon should probably be an equals sign.
+  With the colon, this assignment becomes a label instead,
+  and `_gps_rate` after the colon becomes an unused
+  expression result.
+* Contributors: Kristian Klausen, Morten Fyhn Amundsen
+
+1.4.0 (2020-09-11)
+------------------
+* mavros: use mavlink::minimal:: after incompatible changes in mavlink package
+  Incompatible change: https://github.com/mavlink/mavlink/pull/1463
+  Fix: `#1483 <https://github.com/mavlink/mavros/issues/1483>`_, https://github.com/mavlink/mavlink/issues/1474
+* play_tune: Assign tune format directly
+* play_tune: Uncrustify
+* play_tune: Use msg_set_target and set_string_z
+* play_tune: Write new plugin
+* Contributors: Morten Fyhn Amundsen, Vladimir Ermakov
+
+1.3.0 (2020-08-08)
+------------------
+* Take into account message count for message size
+* Add esc_status plugin.
+* fake_gps.cpp: Implement GPS time data
+* fake_gps.cpp: implement speed accuracy
+* fake_gps.cpp: Added horiz_accuracy and vert_accuracy parameters
+* fake_gps.cpp: Add mocap_withcovariance configuration parameter
+* fake_gps.cpp: add initial support for GPS_INPUT MAVLink message
+* fake_gps.cpp: uncrustify
+* Add gps_status plugin to publish GPS_RAW and GPS_RTK messages from FCU.
+  The timestamps for the gps_status topics take into account the mavlink time and uses the convienence function
+* uncrustify gps_rtk plugin
+* adding support for publishing rtkbaseline msgs over ROS
+* Contributors: CSCE439, Dr.-Ing. Amilcar do Carmo Lucas, Ricardo Marques
+
+1.2.0 (2020-05-22)
+------------------
+* Revert "extras: odom: Hardcode BODY_FRD enum_value to fix compilation"
+  This reverts commit 1a898dea2202ee1af56d698bd40d40994346c5cb.
+* extras: odom: Hardcode BODY_FRD enum_value to fix compilation
+  That PR broke build: https://github.com/mavlink/mavlink/pull/1112
+  TODO: find out what frame should be used
+* Contributors: Vladimir Ermakov
+
 1.1.0 (2020-04-04)
 ------------------
 * Setting the same transparency for all elements

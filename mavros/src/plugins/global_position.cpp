@@ -54,7 +54,7 @@ public:
 		is_map_init(false)
 	{ }
 
-	void initialize(UAS &uas_)
+	void initialize(UAS &uas_) override
 	{
 		PluginBase::initialize(uas_);
 
@@ -95,7 +95,7 @@ public:
 		gp_global_offset_pub = gp_nh.advertise<geometry_msgs::PoseStamped>("gp_lp_offset", 10);
 	}
 
-	Subscriptions get_subscriptions()
+	Subscriptions get_subscriptions() override
 	{
 		return {
 				make_handler(&GlobalPositionPlugin::handle_gps_raw_int),
@@ -494,7 +494,7 @@ private:
 
 	void set_gp_origin_cb(const geographic_msgs::GeoPointStamped::ConstPtr &req)
 	{
-		mavlink::common::msg::SET_GPS_GLOBAL_ORIGIN gpo;
+		mavlink::common::msg::SET_GPS_GLOBAL_ORIGIN gpo = {};
 
 		Eigen::Vector3d global_position;
 
@@ -503,7 +503,7 @@ private:
 
 		gpo.latitude = req->position.latitude * 1E7;
 		gpo.longitude = req->position.longitude * 1E7;
-		gpo.altitude = req->position.altitude * 1E3 + m_uas->ellipsoid_to_geoid_height(&req->position);
+		gpo.altitude = (req->position.altitude + m_uas->ellipsoid_to_geoid_height(&req->position)) * 1E3;
 
 		UAS_FCU(m_uas)->send_message_ignore_drop(gpo);
 	}

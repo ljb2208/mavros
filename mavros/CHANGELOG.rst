@@ -2,6 +2,157 @@
 Changelog for package mavros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.8.0 (2021-05-05)
+------------------
+* lib: ftf: allow both Quaterniond and Quaternionf for quaternion_to_mavlink()
+* extras: distance_sensor: rename param for custom orientation, apply uncrustify
+* px4_config: Add distance_sensor parameters
+* convert whole expression to mm
+* Contributors: Alexey Rogachevskiy, Thomas, Vladimir Ermakov
+
+1.7.1 (2021-04-05)
+------------------
+* re-generate all pymavlink enums
+* Contributors: Vladimir Ermakov
+
+1.7.0 (2021-04-05)
+------------------
+* lib: re-generate the code
+* plugins: mission: re-generate the code
+* MissionBase: correction to file information
+* MissionBase: add copyright from origional waypoint.cpp
+* uncrustify
+* whitespace
+* add rallypoint and geofence plugins to mavros plugins xml
+* add rallypoint and geofence plugins to CMakeList
+* Geofence: add geofence plugin
+* Rallypoint: add rallypoint plugin
+* Waypoint: inherit MissionBase class for mission protocol
+* MissionBase: breakout mission protocol from waypoint.cpp
+* README: Update PX4 Autopilot references
+  Much needed fixes to clarify the project is named correctly throughout the README
+  for the PX4 Autopilot, QGroundControl, and MAVLink
+* Fix https://github.com/mavlink/mavros/issues/849
+* Contributors: Charlie-Burge, Ramon Roche, Tobias Fischer, Vladimir Ermakov
+
+1.6.0 (2021-02-15)
+------------------
+* fix inconsistency in direction of yaw when using set_position in BODY frames and fix problems with yaw in setponit_raw
+* Contributors: zhouzhiwen2000
+
+1.5.2 (2021-02-02)
+------------------
+* readme: add source install note for Noetic release
+* Contributors: Vladimir Ermakov
+
+1.5.1 (2021-01-04)
+------------------
+* Fix tests for renaming of ECEF cases
+  Introduced in 6234af29
+* Initialise message structures
+  Uninitialised Mavlink 2 extension fields were sent if the fields were
+  not later set. Initialising the fields to zero is the default value for
+  extension fields and appears to the receiver as though sender is unaware
+  of Mavlink 2.
+  Instances were found with regex below, more may exist:
+  mavlink::[^:]+::msg::[^:={]+ ?[^:={]*;
+* Contributors: Rob Clarke
+
+1.5.0 (2020-11-11)
+------------------
+* mavros/sys_status: Fill flight_custom_version field
+* mavros: Add override specifiers
+* mavros: Move ECEF tf enums to separate enum class
+  This avoids a bunch of unhandled switch cases, and should
+  improve type safety a bit.
+* Contributors: Morten Fyhn Amundsen
+
+1.4.0 (2020-09-11)
+------------------
+* mavros: use mavlink::minimal:: after incompatible changes in mavlink package
+  Incompatible change: https://github.com/mavlink/mavlink/pull/1463
+  Fix: `#1483 <https://github.com/mavlink/mavros/issues/1483>`_, https://github.com/mavlink/mavlink/issues/1474
+* fixes based on vooon's review
+* fix issue what we couldn't set real parameters to 0.0 in mavros
+* Add error message
+* Fixed compilation error: publish std_msgs::String, not std::string for gcs_ip
+* Dispatch GCS IP address
+* Contributors: Artem Batalov, Marcelino, Morten Fyhn Amundsen, Vladimir Ermakov, Øystein Skotheim
+
+1.3.0 (2020-08-08)
+------------------
+* fake_gps.cpp: implement speed accuracy
+* fake_gps.cpp: Add mocap_withcovariance configuration parameter
+* fake_gps.cpp: add initial support for GPS_INPUT MAVLink message
+* apm.launch: Avoid warning:
+  Warning: You are using <arg> inside an <include> tag with the default=XY attribute - which is superfluous.
+  Use value=XY instead for less confusion.
+  Attribute name: respawn_mavros
+* Added support for MavProxy parameter file format
+* Ignore read-only parameters and statistics parameters in push operations
+* fix indentation
+* transform based on coordinate_frame
+* wind plugin: fix ArduPilot wind transformation
+* Contributors: Ben Wolsieffer, Dr.-Ing. Amilcar do Carmo Lucas, Yuan, Yuan Xu
+
+1.2.0 (2020-05-22)
+------------------
+* has_capability only works for enums
+* Uncrustify
+* Reworked Waypoint plugin to use capabilities_cb
+  Additionally added helper functions has_capability and has_capabilities
+  so that people can use either ints or enums to check if the UAS has a
+  capability. This might make accepting capabilities as a parameter moot
+  though.
+* Added alias for capabilities enum to UAS
+* Added alias for capabilities enum to UAS
+* Added a capabilities change cb queue
+  Plugins can now write functions that they add to the
+  capabilities_cb_vec. These functions will be called only when there is a
+  change to the capabilities themselves not whenever the known status of
+  the fcu_capabilities change.
+  These functions should have a parameter of type
+  mavlink::common::MAV_PROTOCOL_CAPABILITY which is essentially just a
+  uint64_t however being more opinionated is helpful when looking for what
+  the canonical enum names are in the mavlink project header files.
+* Uncrustify
+* Fixed Removed Uncrustify Option
+  I'm not sure why this didn't break when I ran uncrustify previously but
+  it seems that the align_number_left option was removed a while ago with
+  this merge request but I may be mistaken
+  https://github.com/uncrustify/uncrustify/pull/1393
+  I replaced it which align_number_right=true since it seems to be the
+  inverse of align_number_left=true.
+* Removed deprecated MAV_FRAME values
+* Removed use of variant in favor of templates
+  Since ROS messages are now the storage type in the node, providing to
+  and from conversion functions is sufficient and can be better expressed
+  with function templates.
+* Encode factor returns double
+* Changed encoding factor cog code
+* Uncrustify changes
+* Added new parameter to config.yamls
+* Updated waypoint plugin to support MISSION_ITEM_INT
+  These changes add a new parameter use_mission_item_int, which allows
+  users to prefer the old behavior. These changes also verify that the
+  flight controller supports _INT messages since APM only sends
+  REQUEST_ITEM messages even though it accepts _INT items back.
+  This commit is functional and tested with the APM stack only.
+  PX4 sitl jmavsim threw:
+  WP: upload failed: Command is not supported.
+  FCU: IGN MISSION_ITEM: Busy
+* Removed x_lat, y_long, z_alt from WP
+  These values seemed to be used due to the fact that double had
+  a greater resolution than float and doubles are used in the
+  ros msg. However they were only ever used for printing. Since
+  the int version of these messages has a greater resolution I
+  figure it is more useful to print the true value in the mavlink
+  message rather than the ros message value
+* Replaced MISSION_ITEM
+* add yaw to CMD_DO_SET_HOME
+* fix local angular velocity
+* Contributors: Braedon, David Jablonski, Martina Rivizzigno
+
 1.1.0 (2020-04-04)
 ------------------
 * fixed styling

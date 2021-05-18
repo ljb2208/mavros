@@ -2,6 +2,58 @@
 Changelog for package mavros_msgs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.8.0 (2021-05-05)
+------------------
+
+1.7.1 (2021-04-05)
+------------------
+* re-generate all pymavlink enums
+* Contributors: Vladimir Ermakov
+
+1.7.0 (2021-04-05)
+------------------
+* msgs: re-generate the code
+* Contributors: Vladimir Ermakov
+
+1.6.0 (2021-02-15)
+------------------
+
+1.5.2 (2021-02-02)
+------------------
+
+1.5.1 (2021-01-04)
+------------------
+
+1.5.0 (2020-11-11)
+------------------
+* mavros_msgs/VehicleInfo: Add flight_custom_version field
+  Mirroring the field in the corresponding MAVLink message.
+* mavros_msgs/State: Fix PX4 flight mode constants
+  Turns out ROS message string literals don't need quotes,
+  so adding quotes creates strings including the quotes.
+* mavros_msgs/State: Add flight mode constants
+* mavros_msgs: Don't move temporary objects
+* Contributors: Morten Fyhn Amundsen
+
+1.4.0 (2020-09-11)
+------------------
+* play_tune: Assign tune format directly
+* play_tune: Write new plugin
+* Contributors: Morten Fyhn Amundsen
+
+1.3.0 (2020-08-08)
+------------------
+* Add esc_status plugin.
+* Add gps_status plugin to publish GPS_RAW and GPS_RTK messages from FCU.
+  The timestamps for the gps_status topics take into account the mavlink time and uses the convienence function
+* adding support for publishing rtkbaseline msgs over ROS
+* Contributors: CSCE439, Dr.-Ing. Amilcar do Carmo Lucas, Ricardo Marques
+
+1.2.0 (2020-05-22)
+------------------
+* add yaw to CMD_DO_SET_HOME
+* Contributors: David Jablonski
+
 1.1.0 (2020-04-04)
 ------------------
 

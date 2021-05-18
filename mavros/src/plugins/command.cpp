@@ -61,7 +61,7 @@ public:
 		use_comp_id_system_control(false)
 	{ }
 
-	void initialize(UAS &uas_)
+	void initialize(UAS &uas_) override
 	{
 		PluginBase::initialize(uas_);
 
@@ -83,7 +83,7 @@ public:
 		vtol_transition_srv = cmd_nh.advertiseService("vtol_transition", &CommandPlugin::vtol_transition_cb, this);
 	}
 
-	Subscriptions get_subscriptions()
+	Subscriptions get_subscriptions() override
 	{
 		return {
 			       make_handler(&CommandPlugin::handle_command_ack)
@@ -233,7 +233,7 @@ private:
 	template<typename MsgT>
 	inline void set_target(MsgT &cmd, bool broadcast)
 	{
-		using mavlink::common::MAV_COMPONENT;
+		using mavlink::minimal::MAV_COMPONENT;
 
 		const uint8_t tgt_sys_id = (broadcast) ? 0 : m_uas->get_tgt_system();
 		const uint8_t tgt_comp_id = (broadcast) ? 0 :
@@ -339,7 +339,7 @@ private:
 		return send_command_long_and_wait(false,
 			enum_value(MAV_CMD::DO_SET_HOME), 1,
 			(req.current_gps) ? 1.0 : 0.0,
-			0, 0, 0, req.latitude, req.longitude, req.altitude,
+			0, 0, req.yaw, req.latitude, req.longitude, req.altitude,
 			res.success, res.result);
 	}
 

@@ -17,8 +17,14 @@
 	<class name="distance_sensor" type="mavros::extra_plugins::DistanceSensorPlugin" base_class_type="mavros::plugin::PluginBase">
 		<description>Publish DISTANCE_SENSOR message data from FCU or connected sensors in companion computer.</description>
 	</class>
+	<class name="esc_status" type="mavros::extra_plugins::ESCStatusPlugin" base_class_type="mavros::plugin::PluginBase">
+		<description> Publish ESC data from FCU.</description>
+	</class>
 	<class name="fake_gps" type="mavros::extra_plugins::FakeGPSPlugin" base_class_type="mavros::plugin::PluginBase">
 		<description> Sends fake GPS from local position estimation source data (motion capture, vision) to FCU.</description>
+	</class>
+	<class name="gps_status" type="mavros::extra_plugins::GpsStatusPlugin" base_class_type="mavros::plugin::PluginBase">
+		<description>Publish GPS_RAW and GPS_RTK messages from FCU.</description>
 	</class>
 	<class name="gps_rtk" type="mavros::extra_plugins::GpsRtkPlugin" base_class_type="mavros::plugin::PluginBase">
 		<description>Sends the RTCM messages to the FCU for the RTK Fix.</description>
@@ -37,6 +43,9 @@
 	</class>
 	<class name="odom" type="mavros::extra_plugins::OdometryPlugin" base_class_type="mavros::plugin::PluginBase">
 		<description>Send odometry to FCU from another estimator.</description>
+	</class>
+	<class name="play_tune" type="mavros::extra_plugins::PlayTunePlugin" base_class_type="mavros::plugin::PluginBase">
+		<description>Send tunes for the FCU to play.</description>
 	</class>
 	<class name="px4flow" type="mavros::extra_plugins::PX4FlowPlugin" base_class_type="mavros::plugin::PluginBase">
 		<description>Publish OPTICAL_FLOW message data from FCU or PX4Flow module.</description>
